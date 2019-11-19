@@ -3,6 +3,7 @@ from skimage import io, draw, exposure, filters, color, measure, morphology, tra
 from matplotlib import pyplot as plt
 from scipy import ndimage as ndi
 import numpy as np
+import functools
 
 
 def getDistance(x1, x2, y1, y2):
@@ -51,52 +52,98 @@ def drawCircularContours(blackWhite, tolerance):
 def countResult(image):
     contours = measure.find_contours(image, 0.5, "high")
     sumaoczek = 0
+    srodkioczek = []
     for n, contour in enumerate(contours):
         numberOfPointsInContour = len(contour)
         if 50 < numberOfPointsInContour < 500:
             sumaoczek += 1
             plt.plot(contour[:, 1], contour[:, 0], linewidth=3)
+            """centroidx = np.sum(contour[:, 1]) / len(contour)
+            centroidy = np.sum(contour[:, 0]) / len(contour)
+            srodkioczek.append([centroidx, centroidy])
+            #print(srodkioczek[-1])
+
+    odlegloscimiedzyoczkami = []
+    for i in range(len(srodkioczek)):
+        for j in range(i + 1, len(srodkioczek)):
+            odlegloscimiedzyoczkami.append(getDistance(srodkioczek[i][0], srodkioczek[j][0], srodkioczek[i][1], srodkioczek[j][1]))
+    minimalnaodleglosc = 10000
+    for odleglosc in odlegloscimiedzyoczkami:
+        if odleglosc < minimalnaodleglosc:
+            minimalnaodleglosc = odleglosc
+    przydzieloneoczka = [False] * len(srodkioczek)
+    kostki = []
+    for i in range(len(srodkioczek)):
+        if not przydzieloneoczka[i]:
+            kostki.append(1)
+            przydzieloneoczka[i] = True
+            for j in range(i + 1, len(srodkioczek)):
+                if not przydzieloneoczka[j] and getDistance(srodkioczek[i][0], srodkioczek[j][0], srodkioczek[i][1], srodkioczek[j][1]) < 3 * minimalnaodleglosc:
+                    kostki[-1] = kostki[-1] + 1
+                    przydzieloneoczka[j] = True
+                    if kostki[-1] == 6:
+                        break"""
     print("Suma oczek:", sumaoczek)
-    return str(sumaoczek)
+    #kostki = sorted(kostki)
+    #for i in range(len(kostki)):
+        #kostki[i] = str(kostki[i])
+    return sumaoczek
+    #return sumaoczek, ", ".join(kostki)
+
+
+def processImage(dice):
+
+    if (len(dice)) > 1000:
+        dice = transform.resize(dice, (1000, int(dice.shape[1] * 1000 / dice.shape[0])))
+    # io.imshow(dice)
+    # plt.show()
+
+    greyscale = color.rgb2gray(dice)
+    greyscale = filters.gaussian(greyscale, 1.25)
+    greyscaleEdges = filters.sobel(greyscale)
+    greyscaleEdges = exposure.rescale_intensity(greyscaleEdges)
+    # io.imshow(greyscaleEdges)
+    # plt.show()
+
+    blackWhite = greyscaleEdges > 0.14
+    # io.imshow(blackWhite)
+    # plt.show()
+    blackWhite = morphology.remove_small_objects(blackWhite, 50)
+    drawCircularContours(blackWhite, 2.5)
+    # io.imshow(blackWhite)
+    # plt.show()
+    blackWhite = ndi.binary_fill_holes(blackWhite)
+    blackWhite = morphology.remove_small_objects(blackWhite, 150)
+    #suma, countedResult = countResult(blackWhite)
+    suma = countResult(blackWhite)
+    fullResult = "Suma oczek: " + str(suma)
+    #kosteczki = "Kostki: " + countedResult
+    io.imshow(dice)
+    plt.text(dice.shape[1] // 2, 0.1 * len(dice), fullResult, fontsize=16,
+             bbox={'facecolor': 'white', 'alpha': 0.7}, ha='center')
+    #plt.text(dice.shape[1] // 2, 0.9 * len(dice), kosteczki, fontsize=16,
+    #         bbox={'facecolor': 'white', 'alpha': 0.7}, ha='center')
+    plt.axis('off')
+    plt.show()
+    # plt.savefig("k0" + str(i) + ".jpg", bbox_inches='tight')
+    plt.clf()
+    sleep(0.1)
+
 
 def main():
 
-    for i in range(5):
-        dice = io.imread("kostki/dice" + str(i // 10) + str(i % 10) + ".jpg")
-        # print(len(dice))
+    message = "Wpisz nazwe pliku z obrazkiem. Plik musi znajdowac sie w folderze 'kostki'. Wpisz q, jesli chcesz wyjsc\n"
+    while True:
+        userAnswer = input(message)
+        if userAnswer == 'q':
+            break
+        try:
+            dice = io.imread("kostki/" + userAnswer + ".jpg")
+        except FileNotFoundError:
+            print("Bledna nazwa, sprobuj ponownie")
+            continue
+        processImage(dice)
 
-        if (len(dice)) > 1000:
-            dice = transform.resize(dice, (1000, int(dice.shape[1] * 1000 / dice.shape[0])))
-        #io.imshow(dice)
-        #plt.show()
-
-        greyscale = color.rgb2gray(dice)
-        greyscale = filters.gaussian(greyscale, 1.25)
-        greyscaleEdges = filters.sobel(greyscale)
-        greyscaleEdges = exposure.rescale_intensity(greyscaleEdges)
-        #io.imshow(greyscaleEdges)
-        #plt.show()
-
-        blackWhite = greyscaleEdges > 0.14
-        #io.imshow(blackWhite)
-        #plt.show()
-        blackWhite = morphology.remove_small_objects(blackWhite, 50)
-        drawCircularContours(blackWhite, 2.5)
-        #io.imshow(blackWhite)
-        #plt.show()
-        blackWhite = ndi.binary_fill_holes(blackWhite)
-        blackWhite = morphology.remove_small_objects(blackWhite, 150)
-        countedResult = countResult(blackWhite)
-        fullResult = "Suma oczek: " + countedResult
-
-        io.imshow(dice)
-        plt.text(dice.shape[1] // 2, 0.1 * len(dice), fullResult, fontsize=16,
-                 bbox={'facecolor': 'white', 'alpha': 0.7}, ha='center')
-        plt.axis('off')
-        plt.show()
-        #plt.savefig("k0" + str(i) + ".jpg", bbox_inches='tight')
-        plt.clf();
-        sleep(1)
 
 if __name__ == '__main__':
     main()
